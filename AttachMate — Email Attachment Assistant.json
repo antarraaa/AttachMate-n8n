@@ -1,0 +1,844 @@
+{
+  "name": "AttachMate — Email Attachment Assistant",
+  "nodes": [
+    {
+      "parameters": {
+        "downloadAttachments": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.emailReadImap",
+      "typeVersion": 2.2,
+      "position": [
+        -368,
+        16
+      ],
+      "id": "08f00531-3058-4dbb-8679-827c267b0210",
+      "name": "Email Trigger (IMAP)",
+      "retryOnFail": true,
+      "credentials": {
+        "imap": {
+          "id": "vXgshepU2Y7IBQ5E",
+          "name": "IMAP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "=antsus1234@gmail.com",
+        "subject": "attachment received",
+        "message": "=📎 <b>AttachMate — File Analysis Report</b><br><br>\n\nYour attachment was received and analyzed successfully. 💗<br><br><br>\n\n━━━━━━━━━━━━━━━━━━━━━━━━<br>\n📄 <b>FILE OVERVIEW</b><br>\n━━━━━━━━━━━━━━━━━━━━━━━━<br><br>\n\n<b>File Type:</b> {{ $json.file_type }}<br><br>\n\n<b>Rows:</b> {{ $json.rows }}<br><br>\n\n<b>Columns:</b> {{ $json.columns }}<br><br>\n\n📋 <b>COLUMN NAMES</b><br><br>\n\n{{ $json.column_text.replace(/\\n/g, \"<br>\") }}<br>\n\n━━━━━━━━━━━━━━━━━━━━━━━━<br>\n🔎 <b>DATA QUALITY</b><br>\n━━━━━━━━━━━━━━━━━━━━━━━━<br><br>\n\n<b>MISSING VALUES</b><br><br>\n\n{{ $json.missing_text.replace(/\\n/g, \"<br>\") }}<br>\n\n<b>Duplicate Rows:</b> {{ $json.duplicate_rows }}<br><br>\n\n━━━━━━━━━━━━━━━━━━━━━━━━<br>\n🔢 <b>UNIQUE VALUES</b><br>\n━━━━━━━━━━━━━━━━━━━━━━━━<br><br>\n\n{{ $json.unique_text.replace(/\\n/g, \"<br>\") }}<br>\n\n━━━━━━━━━━━━━━━━━━━━━━━━<br>\n📈 <b>NUMERIC SUMMARY</b><br>\n━━━━━━━━━━━━━━━━━━━━━━━━<br><br>\n\n{{ $json.numeric_text.replace(/\\n/g, \"<br>\") }}<br>\n\n━━━━━━━━━━━━━━━━━━━━━━━━<br>\n📊 <b>CATEGORY SUMMARY</b><br>\n━━━━━━━━━━━━━━━━━━━━━━━━<br><br>\n\n{{ $json.category_text.replace(/\\n/g, \"<br>\") }}<br>\n\n━━━━━━━━━━━━━━━━━━━━━━━━<br><br>\n\n✅ <b>Analysis Completed Successfully</b><br><br>\n\n🤖 <b>AttachMate</b>\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1152,
+        -480
+      ],
+      "id": "3e8b99a6-1a07-4e68-8696-5f9ae6c879ad",
+      "name": "Send a message",
+      "webhookId": "75da4ea2-562b-4325-b620-5b75802d3f08",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "sHgG1knJ9n0AMkmw",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "binaryPropertyName": "=attachment_0",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        624,
+        -304
+      ],
+      "id": "31df6cbf-4b3d-43f2-8fc6-14cf427ce759",
+      "name": "Extract from File"
+    },
+    {
+      "parameters": {
+        "language": "pythonNative",
+        "pythonCode": "# ========================================\n# ATTACHMATE - FILE ANALYSIS\n# ========================================\n\n# ----------------------------------------\n# GET FILE NAME AND FILE TYPE\n# ----------------------------------------\n\nfile_name = \"\"\nfile_type = \"CSV\"\n\nif _items:\n\n    binary = _items[0].get(\"binary\", {})\n\n    attachment = binary.get(\"attachment_0\", {})\n\n    file_name = attachment.get(\"fileName\", \"\")\n\n    extension = attachment.get(\"fileExtension\", \"\").lower()\n\n    if extension == \"xlsx\":\n        file_type = \"Excel (XLSX)\"\n\n    elif extension == \"csv\":\n        file_type = \"CSV\"\n\n    elif extension == \"pdf\":\n        file_type = \"PDF\"\n\n\n# ----------------------------------------\n# GET ROW DATA\n# ----------------------------------------\n\nrows = [item[\"json\"] for item in _items]\n\nif not rows:\n    return []\n\n\ncolumns = list(rows[0].keys())\n\n\n# ----------------------------------------\n# BASIC INFORMATION\n# ----------------------------------------\n\nrow_count = len(rows)\n\ncolumn_count = len(columns)\n\n\n# ----------------------------------------\n# MISSING VALUES\n# ----------------------------------------\n\nmissing_values = {}\n\nfor column in columns:\n\n    count = 0\n\n    for row in rows:\n\n        value = row.get(column)\n\n        if value is None or str(value).strip() == \"\":\n            count += 1\n\n    missing_values[column] = count\n\n\n# ----------------------------------------\n# TOTAL MISSING VALUES\n# ----------------------------------------\n\ntotal_missing = sum(missing_values.values())\n\n\n# ----------------------------------------\n# UNIQUE VALUES\n# ----------------------------------------\n\nunique_values = {}\n\nfor column in columns:\n\n    values = []\n\n    for row in rows:\n        values.append(str(row.get(column)))\n\n    unique_values[column] = len(set(values))\n\n\n# ----------------------------------------\n# NUMERIC STATISTICS\n# ----------------------------------------\n\nnumeric_summary = {}\n\nfor column in columns:\n\n    values = []\n\n    for row in rows:\n\n        try:\n            value = float(row.get(column))\n            values.append(value)\n\n        except:\n            pass\n\n    if len(values) > 0:\n\n        numeric_summary[column] = {\n            \"average\": round(\n                sum(values) / len(values), 2\n            ),\n            \"minimum\": min(values),\n            \"maximum\": max(values)\n        }\n\n\n# ----------------------------------------\n# CATEGORY COUNTS\n# ----------------------------------------\n\ncategory_summary = {}\n\nfor column in columns:\n\n    counts = {}\n\n    for row in rows:\n\n        value = str(row.get(column))\n\n        if value not in counts:\n            counts[value] = 1\n        else:\n            counts[value] += 1\n\n    # Show category information only\n    # when there are manageable categories\n\n    if len(counts) > 1 and len(counts) <= 15:\n\n        category_summary[column] = counts\n\n\n# ----------------------------------------\n# DUPLICATE ROWS\n# ----------------------------------------\n\nduplicate_count = (\n    row_count\n    - len(set(str(row) for row in rows))\n)\n\n\n# ----------------------------------------\n# FILE STATUS\n# ----------------------------------------\n\nif total_missing > 0 or duplicate_count > 0:\n\n    status = \"Issues Found\"\n\nelse:\n\n    status = \"Processed Successfully\"\n\n\n# ----------------------------------------\n# COLUMN TEXT\n# ----------------------------------------\n\ncolumn_text = \"\"\n\nfor column in columns:\n\n    column_text += (\n        \"• \"\n        + str(column)\n        + \"\\n\"\n    )\n\n\n# ----------------------------------------\n# MISSING VALUE TEXT\n# ----------------------------------------\n\nmissing_text = \"\"\n\nfor column in missing_values:\n\n    missing_text += (\n        \"• \"\n        + str(column)\n        + \": \"\n        + str(missing_values[column])\n        + \"\\n\"\n    )\n\n\n# ----------------------------------------\n# UNIQUE VALUE TEXT\n# ----------------------------------------\n\nunique_text = \"\"\n\nfor column in unique_values:\n\n    unique_text += (\n        \"• \"\n        + str(column)\n        + \": \"\n        + str(unique_values[column])\n        + \"\\n\"\n    )\n\n\n# ----------------------------------------\n# NUMERIC SUMMARY TEXT\n# ----------------------------------------\n\nnumeric_text = \"\"\n\nfor column in numeric_summary:\n\n    numeric_text += (\n        \"📌 \"\n        + str(column)\n        + \"\\n\"\n    )\n\n    numeric_text += (\n        \"   Average: \"\n        + str(\n            numeric_summary[column][\"average\"]\n        )\n        + \"\\n\"\n    )\n\n    numeric_text += (\n        \"   Minimum: \"\n        + str(\n            numeric_summary[column][\"minimum\"]\n        )\n        + \"\\n\"\n    )\n\n    numeric_text += (\n        \"   Maximum: \"\n        + str(\n            numeric_summary[column][\"maximum\"]\n        )\n        + \"\\n\"\n    )\n\n    numeric_text += \"\\n\"\n\n\n# ----------------------------------------\n# CATEGORY SUMMARY TEXT\n# ----------------------------------------\n\ncategory_text = \"\"\n\nfor column in category_summary:\n\n    category_text += (\n        \"📌 \"\n        + str(column)\n        + \"\\n\"\n    )\n\n    counts = category_summary[column]\n\n    for value in counts:\n\n        category_text += (\n            \"   \"\n            + str(value)\n            + \": \"\n            + str(counts[value])\n            + \"\\n\"\n        )\n\n    category_text += \"\\n\"\n\n\n# ========================================\n# FINAL OUTPUT\n# ========================================\n\nsummary = {\n\n    # ------------------------------------\n    # DASHBOARD DATA\n    # ------------------------------------\n\n    \"file_name\": file_name,\n\n    \"file_type\": file_type,\n\n    \"rows\": row_count,\n\n    \"columns\": column_count,\n\n    \"missing_count\": total_missing,\n\n    \"duplicate_rows\": duplicate_count,\n\n    \"status\": status,\n\n\n    # ------------------------------------\n    # EMAIL REPORT DATA\n    # ------------------------------------\n\n    \"column_names\": columns,\n\n    \"column_text\": column_text,\n\n    \"missing_values\": missing_values,\n\n    \"missing_text\": missing_text,\n\n    \"unique_values\": unique_values,\n\n    \"unique_text\": unique_text,\n\n    \"numeric_summary\": numeric_summary,\n\n    \"numeric_text\": numeric_text,\n\n    \"category_summary\": category_summary,\n\n    \"category_text\": category_text\n}\n\n\nreturn [{\"json\": summary}]"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        864,
+        -208
+      ],
+      "id": "89c2cd3f-db2f-42a7-a665-d58816d4a1ce",
+      "name": "Code in Python"
+    },
+    {
+      "parameters": {
+        "operation": "xlsx",
+        "binaryPropertyName": "attachment_0",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        624,
+        -96
+      ],
+      "id": "18136f32-a4a9-4450-8c56-f8db81014d35",
+      "name": "Extract from File1"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $binary.attachment_0.fileExtension }}",
+                    "rightValue": "csv",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "88b78ea6-093f-4aea-8211-d7c32d481cb1"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "CSV"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "12bd3d41-6347-4a8f-b069-13fb990c42c0",
+                    "leftValue": "={{ $binary.attachment_0.fileExtension }}",
+                    "rightValue": "xlsx",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "xlsx"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "486fd05e-8935-4577-a469-69c79d44d6da",
+                    "leftValue": "={{ $binary.attachment_0.fileExtension }}",
+                    "rightValue": "pdf",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "PDF"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        96,
+        -32
+      ],
+      "id": "90ffa2c1-8c8a-48d2-b310-f2c21ad8fac2",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "85823464-0ca9-45c0-823f-5570675d7cdc",
+              "name": "={{ $binary.attachment_0.fileExtension }}",
+              "value": "{{ $binary.attachment_0.fileExtension }}",
+              "type": "string"
+            },
+            {
+              "id": "411662c8-8b42-4c03-8fca-eb930376882d",
+              "name": "={{ $binary.attachment_0.fileName }}",
+              "value": "={{ $binary.attachment_0.fileName }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        416,
+        -304
+      ],
+      "id": "34abc8bd-0637-4c73-a662-7b7232d1b563",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "41180e5c-7d3b-4d03-8be6-d088288902f0",
+              "name": "file_type",
+              "value": "Excel (XLSX)",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        416,
+        -96
+      ],
+      "id": "3a353698-f65f-48db-9f23-fa2395905117",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "binaryPropertyName": "attachment_0",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        640,
+        112
+      ],
+      "id": "a067b54c-108d-4064-b9f7-5f5ba390dee1",
+      "name": "Extract from File2"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "9ffaf45f-8d10-48b9-84e2-c2639e7c3b14",
+              "name": "file_type",
+              "value": "PDF",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        416,
+        112
+      ],
+      "id": "e44eb9e4-c481-44c6-9323-19fefcc7e4e8",
+      "name": "Edit Fields2"
+    },
+    {
+      "parameters": {
+        "language": "pythonNative",
+        "pythonCode": "data = _items[0][\"json\"]\n\ntext = data.get(\"text\", \"\")\ninfo = data.get(\"info\", {})\n\n# Find useful information from the extracted text\ncontent_types = \"\"\npurpose = \"\"\npage_size = \"\"\n\nlines = text.split(\"\\n\")\n\nfor line in lines:\n    line = line.strip()\n\n    if line.startswith(\"Page Size\"):\n        page_size = line.replace(\"Page Size\", \"\").strip()\n\n    elif line.startswith(\"Content Types\"):\n        content_types = line.replace(\"Content Types\", \"\").strip()\n\n    elif line.startswith(\"Purpose\"):\n        purpose = line.replace(\"Purpose\", \"\").strip()\n\nsummary = {\n    \"file_type\": \"PDF\",\n    \"pages\": data.get(\"numpages\"),\n    \"pdf_version\": info.get(\"PDFFormatVersion\"),\n\n    \"author\": info.get(\"Author\"),\n    \"title\": info.get(\"Title\"),\n    \"creator\": info.get(\"Creator\"),\n    \"producer\": info.get(\"Producer\"),\n\n    \"text_available\": \"Yes\" if text.strip() else \"No\",\n    \"text_length\": len(text),\n\n    \"page_size\": page_size,\n    \"content_types\": content_types,\n    \"purpose\": purpose\n}\n\nreturn [{\"json\": summary}]"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        944,
+        112
+      ],
+      "id": "54348ff4-62c2-4e65-8589-0b47a10ccdc6",
+      "name": "Code in Python1"
+    },
+    {
+      "parameters": {
+        "sendTo": "antsus1234@gmail.com",
+        "subject": "📎 AttachMate — PDF Analysis Report",
+        "emailType": "text",
+        "message": "=📎 AttachMate — PDF Analysis Report\n\nYour PDF attachment was received and analyzed successfully. 💗\n\n━━━━━━━━━━━━━━━━━━\n📄 PDF INFORMATION\n━━━━━━━━━━━━━━━━━━\n\n1. 📄 File Type: {{ $json.file_type }}\n\n2. 📑 Pages: {{ $json.pages }}\n\n3. 📌 PDF Version: {{ $json.pdf_version }}\n\n4. ✍️ Author: {{ $json.author }}\n\n5. 📝 Title: {{ $json.title }}\n\n6. 🛠️ Creator: {{ $json.creator }}\n\n7. 🏭 Producer: {{ $json.producer }}\n\n8. 🔤 Text Length: {{ $json.text_length }} characters\n\n━━━━━━━━━━━━━━━━━━\n\n9. 📖 Text Available: {{ $json.text_available }}\n\n━━━━━━━━━━━━━━━━━━\n\n✅ Analysis Completed\n\n🤖 AttachMate\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1408,
+        112
+      ],
+      "id": "472f9a48-30db-47f9-8a80-833ad00f8315",
+      "name": "Send a message1",
+      "webhookId": "8348e5a8-aa76-441a-9a62-43f710685d10",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "sHgG1knJ9n0AMkmw",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "b603ef1f-7d08-4b41-a947-a171df69a9f1",
+              "leftValue": "={{ $binary.attachment_0?.fileName }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -176,
+        16
+      ],
+      "id": "803b69b9-4b84-442d-91f4-f496c16dfd11",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "sendTo": "antsus1234@gmail.com",
+        "subject": "=AttachMate — Unsupported File Type",
+        "emailType": "text",
+        "message": "📎 <b>AttachMate — File Validation</b><br><br>  ⚠️ The attachment could not be analyzed.<br><br>  AttachMate currently supports only:<br> • CSV<br> • XLSX<br> • PDF<br><br>  Please send one of these supported file types and try again. 💗<br><br>  🤖 <b>AttachMate</b>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        96,
+        272
+      ],
+      "id": "76e9d7f5-be42-4833-9a42-725bf10f0d2c",
+      "name": "Send a message2",
+      "webhookId": "59184e25-9e60-42f3-b47d-7e2f75ff12f8",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "sHgG1knJ9n0AMkmw",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "antsus1234@gmail.com",
+        "subject": "AttachMate — Unsupported File Type",
+        "emailType": "text",
+        "message": "📎 <b>AttachMate — File Validation</b><br><br>  ⚠️ The attachment could not be analyzed.<br><br>  AttachMate currently supports only:<br> • CSV<br> • XLSX<br> • PDF<br><br>  Please send one of these supported file types and try again. 💗<br><br>  🤖 <b>AttachMate</b>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        416,
+        320
+      ],
+      "id": "8c3c532d-d143-4ca4-9aae-406aa48ef64d",
+      "name": "Send a message3",
+      "webhookId": "60a10407-db46-412a-ba01-56346375ae2c",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "sHgG1knJ9n0AMkmw",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "45f5bbf4-036b-4ee7-995c-faea6470512b",
+              "name": "file_name",
+              "value": "={{ $('Email Trigger (IMAP)').item.binary.attachment_0.fileName }}",
+              "type": "string"
+            },
+            {
+              "id": "23b0b99e-2267-4a3b-bbac-4c3bee0619be",
+              "name": "file_type",
+              "value": "={{ $json.file_type }}",
+              "type": "string"
+            },
+            {
+              "id": "dfac009e-4fd8-41ea-8166-eb64c67631fa",
+              "name": "processed_at",
+              "value": "={{ $now }}",
+              "type": "string"
+            },
+            {
+              "id": "b5ab97f5-b9b3-45ea-8216-ed4aba088a75",
+              "name": "rows_count",
+              "value": "={{ $json.rows }}",
+              "type": "string"
+            },
+            {
+              "id": "14d8a84f-b69f-489e-955f-310b3dbea075",
+              "name": "columns_count",
+              "value": "={{ $json.columns }}",
+              "type": "string"
+            },
+            {
+              "id": "75ed6d33-37ef-44f0-af8b-7f98574829de",
+              "name": "missing_count",
+              "value": "={{ Object.values($json.missing_values).reduce((a,b) => a+b, 0) }}",
+              "type": "string"
+            },
+            {
+              "id": "c36dfda5-0d99-484b-8dde-f63913b1b286",
+              "name": "duplicate_count",
+              "value": "={{ $json.duplicate_rows }}",
+              "type": "string"
+            },
+            {
+              "id": "f46d9400-ec20-4645-82f5-428be7af1f16",
+              "name": "status",
+              "value": "{{ Object.values($json.missing_values).reduce((a,b) => a+b, 0) > 0 || $json.duplicate_rows > 0 ? \"Issues Found\" : \"Processed Successfully\" }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1152,
+        -208
+      ],
+      "id": "a6036195-53c3-4f26-8ec1-99a489b6797b",
+      "name": "Edit Fields3"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "1yX1j7NRGswFJClL_G_NY9g-PPwVu6Uzai6PU3_Q8uWs"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1yX1j7NRGswFJClL_G_NY9g-PPwVu6Uzai6PU3_Q8uWs/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "file_name": "={{ $json.file_name }}",
+            "file_type": "={{ $json.file_type }}",
+            "processed_at": "={{ $json.processed_at }}",
+            "rows_count": "={{ $json.rows_count }}",
+            "columns_count": "={{ $json.columns_count }}",
+            "missing_count": "={{ $json.missing_count }}",
+            "duplicate_count": "={{ $json.duplicate_count }}",
+            "status": "={{ $json.status }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "file_name",
+              "displayName": "file_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "file_type",
+              "displayName": "file_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "processed_at",
+              "displayName": "processed_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "rows_count",
+              "displayName": "rows_count",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "columns_count",
+              "displayName": "columns_count",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "missing_count",
+              "displayName": "missing_count",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "duplicate_count",
+              "displayName": "duplicate_count",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1408,
+        -112
+      ],
+      "id": "d5d2d5f9-8f3a-4edc-800f-a3425ea04aaf",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "1acoInsr6x7Lleob",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {
+    "Email Trigger (IMAP)": [
+      {
+        "json": {
+          "textHtml": "\r\n\t\t\t📎 <b>AttachMate — File Analysis Report</b><br><br>\r\n\r\nYour attachment was received and analyzed successfully. 💗<br><br><br>\r\n\r\n━━━━━━━━━━━━━━━━━━━━━━━━<br>\r\n📄 <b>FILE OVERVIEW</b><br>\r\n━━━━━━━━━━━━━━━━━━━━━━━━<br><br>\r\n\r\n<b>File Type:</b> CSV<br><br>\r\n\r\n<b>Rows:</b> 30000<br><br>\r\n\r\n<b>Columns:</b> 16<br><br>\r\n\r\n📋 <b>COLUMN NAMES</b><br><br>\r\n\r\n• id<br>• customer_name<br>• Gender<br>• city<br>• state<br>• channel<br>• call_center<br>• reason<br>• call_timestamp<br>• call duration in minutes<br>• sentiment<br>• csat_score<br>• csat_category<br>• avg_csat<br>• response_time<br>• sla_category<br><br>\r\n\r\n━━━━━━━━━━━━━━━━━━━━━━━━<br>\r\n🔎 <b>DATA QUALITY</b><br>\r\n━━━━━━━━━━━━━━━━━━━━━━━━<br><br>\r\n\r\n<b>MISSING VALUES</b><br><br>\r\n\r\n• id: 0<br>• customer_name: 0<br>• Gender: 0<br>• city: 0<br>• state: 0<br>• channel: 0<br>• call_center: 0<br>• reason: 0<br>• call_timestamp: 0<br>• call duration in minutes: 0<br>• sentiment: 0<br>• csat_score: 0<br>• csat_category: 0<br>• avg_csat: 0<br>• response_time: 0<br>• sla_category: 0<br><br>\r\n\r\n<b>Duplicate Rows:</b> 0<br><br>\r\n\r\n━━━━━━━━━━━━━━━━━━━━━━━━<br>\r\n🔢 <b>UNIQUE VALUES</b><br>\r\n━━━━━━━━━━━━━━━━━━━━━━━━<br><br>\r\n\r\n• id: 30000<br>• customer_name: 10203<br>• Gender: 3<br>• city: 213<br>• state: 37<br>• channel: 4<br>• call_center: 4<br>• reason: 3<br>• call_timestamp: 31<br>• call duration in minutes: 41<br>• sentiment: 5<br>• csat_score: 11<br>• csat_category: 6<br>• avg_csat: 11<br>• response_time: 3<br>• sla_category: 2<br><br>\r\n\r\n━━━━━━━━━━━━━━━━━━━━━━━━<br>\r\n📈 <b>NUMERIC SUMMARY</b><br>\r\n━━━━━━━━━━━━━━━━━━━━━━━━<br><br>\r\n\r\n📌 call duration in minutes<br>   Average: 25.01<br>   Minimum: 5.0<br>   Maximum: 45.0<br><br>📌 csat_score<br>   Average: 5.54<br>   Minimum: 1.0<br>   Maximum: 10.0<br><br>📌 avg_csat<br>   Average: 5.54<br>   Minimum: 1.0<br>   Maximum: 10.0<br><br><br>\r\n\r\n━━━━━━━━━━━━━━━━━━━━━━━━<br>\r\n📊 <b>CATEGORY SUMMARY</b><br>\r\n━━━━━━━━━━━━━━━━━━━━━━━━<br><br>\r\n\r\n📌 Gender<br>   f: 15267<br>   m: 14730<br>   Unknown: 3<br><br>📌 channel<br>   Call-Center: 9655<br>   Chatbot: 7533<br>   Email: 6846<br>   Web: 5966<br><br>📌 call_center<br>   Delhi: 12531<br>   Mumbai: 10002<br>   Chennai: 2541<br>   Kolkata: 4926<br><br>📌 reason<br>   Billing Question: 21410<br>   Service Outage: 4295<br>   Payments: 4295<br><br>📌 sentiment<br>   Neutral: 8003<br>   Very Positive: 2914<br>   Negative: 10101<br>   Very Negative: 5425<br>   Positive: 3557<br><br>📌 csat_score<br>   7: 1196<br>   Not Responded: 18786<br>   1: 541<br>   5: 1740<br>   8: 1147<br>   4: 1402<br>   2: 515<br>   6: 1715<br>   9: 994<br>   3: 1449<br>   10: 515<br><br>📌 csat_category<br>   Very Satisfied: 7307<br>   Not Responded: 18786<br>   Very Dissatisfied: 541<br>   Satisfied: 1402<br>   Dissatisfied: 515<br>   Neutral: 1449<br><br>📌 avg_csat<br>   7.0: 1196<br>   5.54: 18786<br>   1.0: 541<br>   5.0: 1740<br>   8.0: 1147<br>   4.0: 1402<br>   2.0: 515<br>   6.0: 1715<br>   9.0: 994<br>   3.0: 1449<br>   10.0: 515<br><br>📌 response_time<br>   Within SLA: 18748<br>   Above SLA: 3807<br>   Below SLA: 7445<br><br>📌 sla_category<br>   fast response: 26193<br>   delayed response: 3807<br><br><br>\r\n\r\n━━━━━━━━━━━━━━━━━━━━━━━━<br><br>\r\n\r\n✅ <b>Analysis Completed Successfully</b><br><br>\r\n\r\n🤖 <b>AttachMate</b>\r\n\t\t\t<br>\r\n\t\t\t<br>\r\n\t\t\t---\r\n\t\t\t<br>\r\n\t\t\t<em>This email was sent automatically with <a href=\"https://n8n.io/?utm_source=n8n-internal&utm_medium=powered_by&utm_campaign=n8n-nodes-base.gmail_df18123a7b097a112fbcc1b37a35732045a34ca08ed6a8300cd8773d4be4ba70\" target=\"_blank\">n8n</a></em>\r\n\t\t\t\r\n",
+          "textPlain": "",
+          "metadata": {
+            "received": "from 498586711441 named unknown by gmailapi.google.com with HTTPREST; Wed, 30 Sep 2026 10:10:49 -0500",
+            "message-id": "<CA+qLnsPMjpJ3G1uTxBVCE0Hzxz7Cj+6c_JYW_U2GcybVYWCpAA@mail.gmail.com>",
+            "content-transfer-encoding": "quoted-printable",
+            "mime-version": "1.0",
+            "content-type": "text/html; charset=utf-8"
+          },
+          "attributes": {
+            "uid": 3348
+          },
+          "to": "antsus1234@gmail.com",
+          "subject": "attachment received",
+          "date": "Wed, 30 Sep 2026 10:10:49 -0500",
+          "from": "Antara Saraf <antsus1234@gmail.com>"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "textHtml": "\r\n\t\t\t📎 <b>AttachMate — File Analysis Report</b><br><br>\r\n\r\nYour attachment was received and analyzed successfully. 💗<br><br><br>\r\n\r\n━━━━━━━━━━━━━━━━━━━━━━━━<br>\r\n📄 <b>FILE OVERVIEW</b><br>\r\n━━━━━━━━━━━━━━━━━━━━━━━━<br><br>\r\n\r\n<b>File Type:</b> CSV<br><br>\r\n\r\n<b>Rows:</b> 30000<br><br>\r\n\r\n<b>Columns:</b> 16<br><br>\r\n\r\n📋 <b>COLUMN NAMES</b><br><br>\r\n\r\n• id<br>• customer_name<br>• Gender<br>• city<br>• state<br>• channel<br>• call_center<br>• reason<br>• call_timestamp<br>• call duration in minutes<br>• sentiment<br>• csat_score<br>• csat_category<br>• avg_csat<br>• response_time<br>• sla_category<br><br>\r\n\r\n━━━━━━━━━━━━━━━━━━━━━━━━<br>\r\n🔎 <b>DATA QUALITY</b><br>\r\n━━━━━━━━━━━━━━━━━━━━━━━━<br><br>\r\n\r\n<b>MISSING VALUES</b><br><br>\r\n\r\n• id: 0<br>• customer_name: 0<br>• Gender: 0<br>• city: 0<br>• state: 0<br>• channel: 0<br>• call_center: 0<br>• reason: 0<br>• call_timestamp: 0<br>• call duration in minutes: 0<br>• sentiment: 0<br>• csat_score: 0<br>• csat_category: 0<br>• avg_csat: 0<br>• response_time: 0<br>• sla_category: 0<br><br>\r\n\r\n<b>Duplicate Rows:</b> 0<br><br>\r\n\r\n━━━━━━━━━━━━━━━━━━━━━━━━<br>\r\n🔢 <b>UNIQUE VALUES</b><br>\r\n━━━━━━━━━━━━━━━━━━━━━━━━<br><br>\r\n\r\n• id: 30000<br>• customer_name: 10203<br>• Gender: 3<br>• city: 213<br>• state: 37<br>• channel: 4<br>• call_center: 4<br>• reason: 3<br>• call_timestamp: 31<br>• call duration in minutes: 41<br>• sentiment: 5<br>• csat_score: 11<br>• csat_category: 6<br>• avg_csat: 11<br>• response_time: 3<br>• sla_category: 2<br><br>\r\n\r\n━━━━━━━━━━━━━━━━━━━━━━━━<br>\r\n📈 <b>NUMERIC SUMMARY</b><br>\r\n━━━━━━━━━━━━━━━━━━━━━━━━<br><br>\r\n\r\n📌 call duration in minutes<br>   Average: 25.01<br>   Minimum: 5.0<br>   Maximum: 45.0<br><br>📌 csat_score<br>   Average: 5.54<br>   Minimum: 1.0<br>   Maximum: 10.0<br><br>📌 avg_csat<br>   Average: 5.54<br>   Minimum: 1.0<br>   Maximum: 10.0<br><br><br>\r\n\r\n━━━━━━━━━━━━━━━━━━━━━━━━<br>\r\n📊 <b>CATEGORY SUMMARY</b><br>\r\n━━━━━━━━━━━━━━━━━━━━━━━━<br><br>\r\n\r\n📌 Gender<br>   f: 15267<br>   m: 14730<br>   Unknown: 3<br><br>📌 channel<br>   Call-Center: 9655<br>   Chatbot: 7533<br>   Email: 6846<br>   Web: 5966<br><br>📌 call_center<br>   Delhi: 12531<br>   Mumbai: 10002<br>   Chennai: 2541<br>   Kolkata: 4926<br><br>📌 reason<br>   Billing Question: 21410<br>   Service Outage: 4295<br>   Payments: 4295<br><br>📌 sentiment<br>   Neutral: 8003<br>   Very Positive: 2914<br>   Negative: 10101<br>   Very Negative: 5425<br>   Positive: 3557<br><br>📌 csat_score<br>   7: 1196<br>   Not Responded: 18786<br>   1: 541<br>   5: 1740<br>   8: 1147<br>   4: 1402<br>   2: 515<br>   6: 1715<br>   9: 994<br>   3: 1449<br>   10: 515<br><br>📌 csat_category<br>   Very Satisfied: 7307<br>   Not Responded: 18786<br>   Very Dissatisfied: 541<br>   Satisfied: 1402<br>   Dissatisfied: 515<br>   Neutral: 1449<br><br>📌 avg_csat<br>   7.0: 1196<br>   5.54: 18786<br>   1.0: 541<br>   5.0: 1740<br>   8.0: 1147<br>   4.0: 1402<br>   2.0: 515<br>   6.0: 1715<br>   9.0: 994<br>   3.0: 1449<br>   10.0: 515<br><br>📌 response_time<br>   Within SLA: 18748<br>   Above SLA: 3807<br>   Below SLA: 7445<br><br>📌 sla_category<br>   fast response: 26193<br>   delayed response: 3807<br><br><br>\r\n\r\n━━━━━━━━━━━━━━━━━━━━━━━━<br><br>\r\n\r\n✅ <b>Analysis Completed Successfully</b><br><br>\r\n\r\n🤖 <b>AttachMate</b>\r\n\t\t\t<br>\r\n\t\t\t<br>\r\n\t\t\t---\r\n\t\t\t<br>\r\n\t\t\t<em>This email was sent automatically with <a href=\"https://n8n.io/?utm_source=n8n-internal&utm_medium=powered_by&utm_campaign=n8n-nodes-base.gmail_df18123a7b097a112fbcc1b37a35732045a34ca08ed6a8300cd8773d4be4ba70\" target=\"_blank\">n8n</a></em>\r\n\t\t\t\r\n",
+          "textPlain": "",
+          "metadata": {
+            "received": "from 498586711441 named unknown by gmailapi.google.com with HTTPREST; Wed, 30 Sep 2026 08:10:51 -0700",
+            "message-id": "<CA+qLnsPiKvFxaSV65rxySt5sDJwXUBQopprkPD9NV8Ckg+Enmw@mail.gmail.com>",
+            "content-transfer-encoding": "quoted-printable",
+            "mime-version": "1.0",
+            "content-type": "text/html; charset=utf-8"
+          },
+          "attributes": {
+            "uid": 3349
+          },
+          "to": "antsus1234@gmail.com",
+          "subject": "attachment received",
+          "date": "Wed, 30 Sep 2026 08:10:51 -0700",
+          "from": "Antara Saraf <antsus1234@gmail.com>"
+        },
+        "pairedItem": {
+          "item": 1
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Send a message": {
+      "main": [
+        []
+      ]
+    },
+    "Email Trigger (IMAP)": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "Code in Python",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in Python": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields3",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File1": {
+      "main": [
+        [
+          {
+            "node": "Code in Python",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit Fields2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a message3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "Extract from File1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields2": {
+      "main": [
+        [
+          {
+            "node": "Extract from File2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File2": {
+      "main": [
+        [
+          {
+            "node": "Code in Python1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in Python1": {
+      "main": [
+        [
+          {
+            "node": "Send a message1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message1": {
+      "main": [
+        []
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a message2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields3": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append row in sheet": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "versionId": "a59c4546-fbfd-42d7-b38f-e3c680a21c3d",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "df18123a7b097a112fbcc1b37a35732045a34ca08ed6a8300cd8773d4be4ba70"
+  },
+  "nodeGroups": [],
+  "id": "ZFbNMBnplY1Cygbl",
+  "tags": []
+}
