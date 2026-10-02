@@ -23,3 +23,11 @@ AttachMate is an automated email attachment analysis workflow built with n8n and
 5. File information and key insights are prepared into a report.
 6. The report is sent automatically by email, and the results are saved in Google Sheets.
 7. Unsupported files are handled through a fallback process.
+
+## Technologies Used
+
+* n8n — Workflow automation and process orchestration
+* Python — File processing and data analysis
+* Gmail / IMAP — Email trigger and report delivery
+* Google Sheets — Analysis result storage
+
